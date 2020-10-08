@@ -1,7 +1,0 @@
-__pycache__/
-sysControlEnv/
-*.egg-info/
-.vscode/
-*~lock*
-file.json
-hems.log
