@@ -20,4 +20,5 @@ plots/
 powerflow/powerflow
 pv_centralized/covee
 venv_ext
+powerflow
 
