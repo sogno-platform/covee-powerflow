@@ -22,6 +22,7 @@ import requests
 import json
 import csv
 import argparse
+import paho.mqtt.client as mqtt
 
 
 parser = argparse.ArgumentParser()
@@ -40,6 +41,19 @@ field_styles=dict(
     name=dict(color='blue')))
 logging.info("Program Start")
 
+if bool(os.getenv('MQTT_ENABLED')):
+    mqtt_url = str(os.getenv('MQTTURL'))
+    mqtt_port = os.getenv('MQTTPORT')
+    # logging.debug("MQTT COnnection Details "+ mqtt_url+" : "+mqtt_port)
+
+    try:
+        logging.info("Establishing MQTT Connection")
+        client = mqtt.Client()
+        client.connect('reserve-msgbroker-local', port=1883)
+        logging.info("MQTT Connection Established")
+    except Exception as e:
+        logging.error("Failed to establish MQTT connection")
+        logging.error(e)
 
 def initialize( name, profiles):
     # Input Data
@@ -234,8 +248,33 @@ def measurement_output(data, *args):
     except:
         logging.warn("No connection to control")
 
-dmuObj.addRx(measurement_output,"voltage_dict")
-dmuObj.addRx(measurement_output,"pv_input_dict")
+def mqtt_measurement_output(data, *args):
+    reqData = {}
+    reqData["data"] =  data
+    headers = {'content-type': 'application/json'}
+    try:
+        jsonData = (json.dumps(reqData)).encode("utf-8") 
+        logging.debug(jsonData)
+    except:
+        logging.warn("Malformed json")
+    try:
+        for key in data.keys():
+            # if key == "voltage_measurements":
+          
+            client.publish(key, payload=jsonData)
+            #     # result = requests.post("http://pv_centralized:8000/set/voltage/voltage_node/", data=jsonData, headers=headers)
+            # if key == "pv_input_measurements":
+            #     result = requests.post("http://pv_centralized:8000/set/pv_input/pv_input_node/", data=jsonData, headers=headers)
+    except Exception as e:
+        logging.error(e)
+        logging.warn("No connection to control")
+
+if bool(os.getenv('MQTT_ENABLED')):
+    dmuObj.addRx(mqtt_measurement_output,"voltage_dict")
+    dmuObj.addRx(mqtt_measurement_output,"pv_input_dict")
+else:
+    dmuObj.addRx(measurement_output,"voltage_dict")
+    dmuObj.addRx(measurement_output,"pv_input_dict")
 
 # read profiles from CSV files
 # =======================================================================
