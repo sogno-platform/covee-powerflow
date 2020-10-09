@@ -1,0 +1,31 @@
+version: '3.3'
+
+services:
+  # grafana:
+  #   image: grafana/grafana
+  #   ports:
+  #     - 3000:3000
+  #   environment:
+  #     - "GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource"
+  powerflow:
+    env_file: ../conf.env
+    build:
+      context: '.'
+      dockerfile: './Dockerfile'
+    networks: 
+      - edgeflex-network
+    volumes:
+      - .:/powerflow
+    command: bash -c "cd powerflow && 
+                      make init &&
+                      cd .. &&
+                      /powerflow/powerflow/bin/python3 /powerflow/runPF.py --ext_port 7070"
+    ports:
+      - 7070:8000
+      - 1885:1883
+    
+
+networks:
+  edgeflex-network:
+    external:
+      name: edgeflex-network
