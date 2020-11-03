@@ -349,7 +349,7 @@ try:
         [v_tot,v_gen,p,c] = run_Power_Flow(ppc,active_nodes,p_value,q_value,pv_profile_k,p_load_k)
       
         for i in range(len(full_nodes)):
-            voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[i]
+            voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[int(full_nodes[i])-1]
             pv_input_dict["node_"+str(int(full_nodes[i]))] = pv_profile_k[i]
         dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
         dmuObj.setDataSubset({"pv_input_measurements": pv_input_dict},"pv_input_dict")
