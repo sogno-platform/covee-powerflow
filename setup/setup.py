@@ -7,7 +7,8 @@ requiredPackages = [#should only contain third party pakages
     "PYPOWER",
     "matplotlib",
     "ipython",
-    "requests"
+    "requests",
+    "paho-mqtt"
 ],
 
 setup(

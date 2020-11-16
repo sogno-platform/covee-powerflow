@@ -16,6 +16,7 @@ import coloredlogs, logging, threading
 from threading import Thread
 from submodules.dmu.dmu import dmu
 from submodules.dmu.httpSrv import httpSrv
+from submodules.dmu.mqttClient import mqttClient
 import time
 import sys
 import requests
@@ -128,9 +129,6 @@ def run_Power_Flow(ppc, active_nodes, active_power,reactive_power,pv_profile,loa
     for i in range(len(c)):
         gen[i][QG] = reactive_power[i]
         gen[i][PG] = gen[i][PG] + active_power[i]
-    # for i in range(int(len(c))):
-    #     gen[i+1][QG] = reactive_power[i]
-    #     gen[i+1][PG] = pv_profile[i] + active_power[i]
 
     ppc['bus'] = bus
     ppc['gen'] = gen
@@ -157,9 +155,8 @@ def run_Power_Flow(ppc, active_nodes, active_power,reactive_power,pv_profile,loa
 ''' Initialize objects '''
 dmuObj = dmu()
 
-''' Start http server '''
-httpSrvThread1 = threading.Thread(name='httpSrv',target=httpSrv, args=("0.0.0.0", 8000 ,dmuObj,))
-httpSrvThread1.start()
+''' Start mqtt client '''
+mqttObj = mqttClient("mqtt", dmuObj)
 
 httpSrvThread2 = threading.Thread(name='httpSrv',target=httpSrv, args=("0.0.0.0", int(ext_port) ,dmuObj,))
 httpSrvThread2.start()
@@ -199,14 +196,14 @@ dmuObj.addElm("pv_input_dict", pv_input_dict)
 #########################  Section for Receiving Signal  ###############################################
 ########################################################################################################
 
-def active_power_control_input(data,  *args):
+def active_power_control_input(data, uuid, name,  *args):
     active_power_control_dict = {}  
     dmuObj.setDataSubset(data,"active_power_control_dict")
-def reactive_power_control_input(data,  *args):
+def reactive_power_control_input(data, uuid, name,  *args):
     reactive_power_control_dict = {}  
     dmuObj.setDataSubset(data,"reactive_power_control_dict")
 
-def api_cntr_input(data,  *args):   
+def api_cntr_input(data, uuid, name,  *args):   
     tmpData = []
     logging.debug("RECEIVED EXTERNAL CONTROL")
     logging.debug(data)       
@@ -214,67 +211,21 @@ def api_cntr_input(data,  *args):
 
 # Receive from external Control
 dmuObj.addElm("nodes", dict_ext_cntr)
-dmuObj.addRx(api_cntr_input, "nodes", "data_nodes")
+dmuObj.addElmMonitor(api_cntr_input, "nodes", "data_nodes")
 
 # Receive active power control
 dmuObj.addElm("active_power", simDict)
-dmuObj.addRx(active_power_control_input, "active_power", "active_power_control")
+mqttObj.attachSubscriber("/voltage_control/control/active_power", "json","active_power_control_dict")
 # Receive reactive power control
 dmuObj.addElm("reactive_power", simDict)
-dmuObj.addRx(reactive_power_control_input, "reactive_power", "reactive_power_control")
+mqttObj.attachSubscriber("/voltage_control/control/reactive_power", "json","reactive_power_control_dict")
 
 ########################################################################################################
 #########################  Section for Sending Signal  #################################################
 ########################################################################################################
 
-def measurement_output(data, *args):
-
-    reqData = {}
-    reqData["data"] =  data
-    # logging.debug("voltage sent")
-    # logging.debug(data)
-
-    headers = {'content-type': 'application/json'}
-    try:
-        jsonData = (json.dumps(reqData)).encode("utf-8")
-    except:
-        logging.warn("Malformed json")
-    try:
-        for key in data.keys():
-            if key == "voltage_measurements":
-                result = requests.post("http://pv_centralized:8000/set/voltage/voltage_node/", data=jsonData, headers=headers)
-            if key == "pv_input_measurements":
-                result = requests.post("http://pv_centralized:8000/set/pv_input/pv_input_node/", data=jsonData, headers=headers)
-    except:
-        logging.warn("No connection to control")
-
-def mqtt_measurement_output(data, *args):
-    reqData = {}
-    reqData["data"] =  data
-    headers = {'content-type': 'application/json'}
-    try:
-        jsonData = (json.dumps(reqData)).encode("utf-8") 
-        logging.debug(jsonData)
-    except:
-        logging.warn("Malformed json")
-    try:
-        for key in data.keys():
-            # if key == "voltage_measurements":
-          
-            client.publish(key, payload=jsonData)
-            #     # result = requests.post("http://pv_centralized:8000/set/voltage/voltage_node/", data=jsonData, headers=headers)
-            # if key == "pv_input_measurements":
-            #     result = requests.post("http://pv_centralized:8000/set/pv_input/pv_input_node/", data=jsonData, headers=headers)
-    except Exception as e:
-        logging.error(e)
-        logging.warn("No connection to control")
-
-if bool(os.getenv('MQTT_ENABLED')):
-    dmuObj.addRx(mqtt_measurement_output,"voltage_dict")
-    dmuObj.addRx(mqtt_measurement_output,"pv_input_dict")
-else:
-    dmuObj.addRx(measurement_output,"voltage_dict")
-    dmuObj.addRx(measurement_output,"pv_input_dict")
+mqttObj.attachPublisher("/voltage_control/measuremnts/voltage","json","voltage_dict")
+mqttObj.attachPublisher("/voltage_control/measuremnts/pv","json","pv_input_dict")
 
 # read profiles from CSV files
 # =======================================================================
