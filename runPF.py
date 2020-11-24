@@ -223,9 +223,10 @@ mqttObj.attachSubscriber("/voltage_control/control/reactive_power", "json","reac
 ########################################################################################################
 #########################  Section for Sending Signal  #################################################
 ########################################################################################################
-
-mqttObj.attachPublisher("/voltage_control/measuremnts/voltage","json","voltage_dict")
-mqttObj.attachPublisher("/voltage_control/measuremnts/pv","json","pv_input_dict")
+def define_topic(nodes):
+    for node in nodes:
+        mqttObj.attachPublisher("/voltage_control/measurements/node"+str(int(node))+"/voltage","json","voltage_dict_node"+str(int(node)))
+        mqttObj.attachPublisher("/voltage_control/measurements/node"+str(int(node))+"/pv","json","pv_input_dict_node"+str(int(node)))
 
 # read profiles from CSV files
 # =======================================================================
@@ -262,7 +263,12 @@ full_reactive_power_dict = {}
 for i in full_nodes:
     full_active_power_dict["node_"+str(int(i))] = 0.0
     full_reactive_power_dict["node_"+str(int(i))] = 0.0
+    dmuObj.addElm("voltage_dict_node"+str(int(i)), {})
+    dmuObj.addElm("pv_input_dict_node"+str(int(i)), {})
 
+
+######################### Define MQTT topics #################################################
+define_topic(full_nodes)
 
 ########################################### Main #########################################################
 try:
@@ -302,9 +308,13 @@ try:
         for i in range(len(full_nodes)):
             voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[int(full_nodes[i])-1]
             pv_input_dict["node_"+str(int(full_nodes[i]))] = pv_profile_k[i]
+            dmuObj.setDataSubset({"voltage":voltage_dict["node_"+str(int(full_nodes[i]))]},"voltage_dict_node"+str(int(full_nodes[i])))
+            dmuObj.setDataSubset({"power":pv_input_dict["node_"+str(int(full_nodes[i]))]},"pv_input_dict_node"+str(int(full_nodes[i])))
+            print({"voltage":voltage_dict["node_"+str(int(full_nodes[i]))]})
+
         dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
         dmuObj.setDataSubset({"pv_input_measurements": pv_input_dict},"pv_input_dict")
-
+        
         for i in range(grid_data["nb"]):
             if i in active_nodes and active_power is not None and  reactive_power is not None:
                 sim_list2= [reactive_power["node_"+str(i+1)], time.time()*1000]
@@ -335,7 +345,7 @@ try:
         logging.debug(active_power_value)        
         logging.debug(reactive_power_value)
 
-        time.sleep(0.3)
+        time.sleep(3)
         k = min(k+1,3000)
         print(k)
 
