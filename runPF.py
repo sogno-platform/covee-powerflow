@@ -25,12 +25,12 @@ import csv
 import argparse
 import paho.mqtt.client as mqtt
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--ext_port', nargs='*', required=True)
 args = vars(parser.parse_args())
 ext_port = args['ext_port'][0]
 
+cwd = os.getcwd()
 
 coloredlogs.install(level='DEBUG',
 fmt='%(asctime)s %(levelname)-8s %(name)s[%(process)d] %(message)s',
@@ -141,10 +141,10 @@ def run_Power_Flow(ppc, active_nodes, active_power,reactive_power,pv_profile,loa
     bus_results = results[0]['bus']
 
     for i in range(grid_data["nb"]):
-        v_tot.append(bus_results[int(i-1)][VM])
+        v_tot.append(bus_results[int(i)][VM])
 
     for i in range(int(len(c))):
-        v_gen.append(bus_results[int(c[i]-1)][VM])
+        v_gen.append(v_tot[int(c[i])-1])
         p.append(gen[i+1][PG])
     
     return v_tot,v_gen,p,c
@@ -263,7 +263,7 @@ for i in full_nodes:
     full_active_power_dict["node_"+str(int(i))] = 0.0
     full_reactive_power_dict["node_"+str(int(i))] = 0.0
 
-
+voltage_tot = []
 ########################################### Main #########################################################
 try:
     while True:
@@ -335,9 +335,18 @@ try:
         logging.debug(active_power_value)        
         logging.debug(reactive_power_value)
 
+        voltage_tot.append(v_tot)
+
         time.sleep(0.3)
         k = min(k+1,3000)
         print(k)
 
 except (KeyboardInterrupt, SystemExit):
+
+    rows = voltage_tot
+    with open('powerflow/csv_files/voltage.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        wr = csv.writer(csv_file)
+        for row in rows:
+            wr.writerow(row)
+    csv_file.close()
     print('simulation finished')
