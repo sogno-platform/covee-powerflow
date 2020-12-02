@@ -256,6 +256,7 @@ for i in range(grid_data["nb"]+1):
     dmuObj.addElm("grafana reactive power node_"+str(i), dataDict)
     dmuObj.addElm("grafana active power node_"+str(i), dataDict)
     dmuObj.addElm("grafana pv production node_"+str(i), dataDict)
+    dmuObj.addElm("grafana active power ESS node_"+str(i), dataDict)
 
 k=800
 
@@ -352,7 +353,7 @@ try:
             if i == 0:
                 pass
             else:
-                print(full_active_power_ESS_dict)
+                print(full_active_power_ESS_dict["node_"+str(i+1)])
                 sim_list5= [full_active_power_ESS_dict["node_"+str(i+1)], time.time()*1000]
                 dmuObj.setDataSubset(sim_list5,"grafana active power ESS node_"+str(i+1),grafanaArrayPos)   
         
