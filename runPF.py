@@ -1,7 +1,7 @@
 from pypower.api import *
 from pypower.ext2int import ext2int
 from pypower.idx_brch import F_BUS, T_BUS, TAP, BR_R, BR_X, BR_B, RATE_A, PF, QF, PT, QT
-from pypower.idx_bus import BUS_TYPE, REF, PD, QD, VM, VA, VMAX, VMIN
+from pypower.idx_bus import BUS_I, BUS_TYPE, REF, PD, QD, VM, VA, VMAX, VMIN
 from pypower.idx_gen import GEN_BUS, PG, QG, PMAX, PMIN, QMAX, QMIN, VG
 from pypower.int2ext import int2ext
 
@@ -85,7 +85,7 @@ def initialize( name, profiles):
 
     return grid_data
 
-def run_Power_Flow(ppc, active_nodes, active_power,reactive_power,active_power_ESS,pv_profile,load_profile):
+def run_Power_Flow(ppc, active_nodes, active_ESS, active_power,reactive_power,active_power_ESS,pv_profile,load_profile):
     ppc = ext2int(ppc)      # convert to continuous indexing starting from 0
     BUS_TYPE = 1
 
@@ -124,12 +124,15 @@ def run_Power_Flow(ppc, active_nodes, active_power,reactive_power,active_power_E
     for i in range(int(nb)-1):
         bus[i+1][PD] = load_profile[i]#0.3 
         bus[i+1][QD] = 0.0
+    for j in range(len(active_ESS)):
+        if float(j) == bus[j+1][BUS_I]:
+            bus[i+1][PD] = bus[i+1][PD]-active_power_ESS[j]
     for i in range(ng-1):
         gen[i+1][PG] = pv_profile[i]
     for j in range(len(c)):
         if float(j) == gen[j][GEN_BUS]:
             gen[j][QG] = reactive_power[j]
-            gen[j][PG] = gen[j+1][PG] + active_power[j]+active_power_ESS[j]
+            gen[j][PG] = gen[j+1][PG] + active_power[j]
 
     ppc['bus'] = bus
     ppc['gen'] = gen
@@ -265,6 +268,7 @@ active_nodes = list(np.array(np.matrix(ppc["gen"])[:,0]).flatten())
 full_nodes = active_nodes[1:len(active_nodes)]
 active_nodes = active_nodes[1:len(active_nodes)]
 active_nodes = [float(i)-1 for i in active_nodes]
+active_ESS = active_nodes
 full_active_power_dict = {}
 full_reactive_power_dict = {}
 full_active_power_ESS_dict = {}
@@ -320,7 +324,7 @@ try:
         p_load_k = P_load_list[k][:]#[0.5]*grid_data["nb"]#
 
         print("active nodes ",active_nodes)
-        [v_tot,v_gen,p,c] = run_Power_Flow(ppc,active_nodes,p_value,q_value,p_ESS_value,pv_profile_k,p_load_k)
+        [v_tot,v_gen,p,c] = run_Power_Flow(ppc,active_nodes, active_ESS,p_value,q_value,p_ESS_value,pv_profile_k,p_load_k)
       
         for i in range(len(full_nodes)):
             voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[int(full_nodes[i])-1]
@@ -353,7 +357,6 @@ try:
             if i == 0:
                 pass
             else:
-                print(full_active_power_ESS_dict["node_"+str(i+1)])
                 sim_list5= [full_active_power_ESS_dict["node_"+str(i+1)], time.time()*1000]
                 dmuObj.setDataSubset(sim_list5,"grafana active power ESS node_"+str(i+1),grafanaArrayPos)   
         
