@@ -12,6 +12,9 @@ __pycache__
 .idea
 .vscode
 csv_files/*.csv
+csv_files/Plot.py
+*.eps
+*.png
 *.idea
 *.vscode/
 *.ipynb_checkpoints/
@@ -21,4 +24,5 @@ powerflow/powerflow
 pv_centralized/covee
 venv_ext
 powerflow
+influxdb
 

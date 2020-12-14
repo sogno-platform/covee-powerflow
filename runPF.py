@@ -131,8 +131,8 @@ def run_Power_Flow(ppc, active_nodes, active_ESS, active_power,reactive_power,ac
         gen[i+1][PG] = pv_profile[i]
     for j in range(len(c)):
         if float(j) == gen[j][GEN_BUS]:
-            gen[j][QG] = reactive_power[j]
-            gen[j][PG] = gen[j+1][PG] + active_power[j]
+            gen[j+1][QG] = reactive_power[j]
+            gen[j+1][PG] = gen[j+1][PG] + active_power[j]
 
     ppc['bus'] = bus
     ppc['gen'] = gen
@@ -190,6 +190,7 @@ active_power_control_dict = {}
 reactive_power_control_dict = {}
 active_power_ESS_control_dict = {}
 pv_input_dict = {}
+measurements = {}
 
 # add the simulation dictionary to mmu object
 dmuObj.addElm("simDict", simDict)
@@ -198,6 +199,7 @@ dmuObj.addElm("active_power_control_dict", active_power_control_dict)
 dmuObj.addElm("reactive_power_control_dict", reactive_power_control_dict)
 dmuObj.addElm("active_power_ESS_control_dict", active_power_ESS_control_dict)
 dmuObj.addElm("pv_input_dict", pv_input_dict)
+dmuObj.addElm("measurements",measurements)
 
 ########################################################################################################
 #########################  Section for Receiving Signal  ###############################################
@@ -236,6 +238,7 @@ mqttObj.attachSubscriber("/voltage_control/control/active_power_ESS", "json","ac
 
 mqttObj.attachPublisher("/voltage_control/measuremnts/voltage","json","voltage_dict")
 mqttObj.attachPublisher("/voltage_control/measuremnts/pv","json","pv_input_dict")
+mqttObj.attachPublisher("measurements","json","measurements")
 
 # read profiles from CSV files
 # =======================================================================
@@ -245,23 +248,7 @@ profiles = read_profiles()
 ppc = case()
 grid_data = initialize(ppc, [PV_list, P_load_list])
 
-
-########################################################################################################
-#########################  Section for Posting Signal (for Grafana) ####################################
-########################################################################################################
-grafanaArrayPos = 0
-dataDict = []
-for i in range(1000):
-    dataDict.extend([[0,0]])
-
-for i in range(grid_data["nb"]+1):
-    dmuObj.addElm("grafana voltage node_"+str(i), dataDict)
-    dmuObj.addElm("grafana reactive power node_"+str(i), dataDict)
-    dmuObj.addElm("grafana active power node_"+str(i), dataDict)
-    dmuObj.addElm("grafana pv production node_"+str(i), dataDict)
-    dmuObj.addElm("grafana active power ESS node_"+str(i), dataDict)
-
-k=800
+k=0
 
 ########################## Initialization vectors  ######################################################
 active_nodes = list(np.array(np.matrix(ppc["gen"])[:,0]).flatten())
@@ -278,12 +265,16 @@ for i in full_nodes:
     full_active_power_ESS_dict["node_"+str(int(i))] = 0.0
 
 voltage_tot = []
+active_power_pv_tot = []
+reactive_power_pv_tot = []
+active_power_ess_tot = []
 ########################################### Main #########################################################
 try:
     while True:
         # intialize the dictionaries
         voltage_dict = {}
         pv_input_dict = {}
+        measurements = {}
         
         active_power_value = dmuObj.getDataSubset("active_power_control_dict")
         active_power = active_power_value.get("active_power", None)
@@ -332,42 +323,18 @@ try:
         dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
         dmuObj.setDataSubset({"pv_input_measurements": pv_input_dict},"pv_input_dict")
 
-        for i in range(grid_data["nb"]):
-            if i in active_nodes and active_power is not None and  reactive_power is not None:
-                sim_list2= [reactive_power["node_"+str(i+1)], time.time()*1000]
-                dmuObj.setDataSubset(sim_list2,"grafana reactive power node_"+str(i+1),grafanaArrayPos)
-                sim_list3= [active_power["node_"+str(i+1)], time.time()*1000]
-                dmuObj.setDataSubset(sim_list3,"grafana active power node_"+str(i+1),grafanaArrayPos)
-                if i == 22:
-                    sim_list4 = [0.0, time.time()*1000]
-                    dmuObj.setDataSubset(sim_list4,"grafana pv production node_"+str(i+1),grafanaArrayPos)
-                else:
-                    sim_list4 = [p[i], time.time()*1000]
-                    dmuObj.setDataSubset(sim_list4,"grafana pv production node_"+str(i+1),grafanaArrayPos)        
-            else:
-                sim_list2= [0.0, time.time()*1000]
-                dmuObj.setDataSubset(sim_list2,"grafana reactive power node_"+str(i+1),grafanaArrayPos)
-                sim_list3= [0.0, time.time()*1000]
-                dmuObj.setDataSubset(sim_list3,"grafana active power node_"+str(i+1),grafanaArrayPos)
-                sim_list4 = [0.0, time.time()*1000]
-                dmuObj.setDataSubset(sim_list4,"grafana pv production node_"+str(i+1),grafanaArrayPos)
-            sim_list = [v_tot[i], time.time()*1000]
-            dmuObj.setDataSubset(sim_list,"grafana voltage node_"+str(i+1),grafanaArrayPos)
-            
-            if i == 0:
-                pass
-            else:
-                sim_list5= [full_active_power_ESS_dict["node_"+str(i+1)], time.time()*1000]
-                dmuObj.setDataSubset(sim_list5,"grafana active power ESS node_"+str(i+1),grafanaArrayPos)   
-        
-        grafanaArrayPos = grafanaArrayPos+1
-        if grafanaArrayPos>1000:
-            grafanaArrayPos = 0
+        measurements={"test":0.1}
+        measurements.update({"voltage_measurements": voltage_dict})
+        measurements.update({"pv_input_measurements": pv_input_dict})
+        dmuObj.setDataSubset(measurements,"measurements")
 
         logging.debug(active_power_value)        
         logging.debug(reactive_power_value)
 
         voltage_tot.append(v_tot)
+        active_power_pv_tot.append(p)
+        reactive_power_pv_tot.append(q_value)
+        active_power_ess_tot.append(p_ESS_value)
 
         time.sleep(0.3)
         k = min(k+1,3000)
@@ -381,4 +348,26 @@ except (KeyboardInterrupt, SystemExit):
         for row in rows:
             wr.writerow(row)
     csv_file.close()
+
+    rows = active_power_pv_tot
+    with open('powerflow/csv_files/active_power_pv_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        wr = csv.writer(csv_file)
+        for row in rows:
+            wr.writerow(row)
+    csv_file.close()
+
+    rows = reactive_power_pv_tot
+    with open('powerflow/csv_files/reactive_power_pv_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        wr = csv.writer(csv_file)
+        for row in rows:
+            wr.writerow(row)
+    csv_file.close()
+
+    rows = active_power_ess_tot
+    with open('powerflow/csv_files/active_power_ess_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        wr = csv.writer(csv_file)
+        for row in rows:
+            wr.writerow(row)
+    csv_file.close()
+
     print('simulation finished')
