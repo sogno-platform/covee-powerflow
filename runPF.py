@@ -161,7 +161,8 @@ def run_Power_Flow(ppc, active_nodes, active_ESS, active_power,reactive_power,ac
 dmuObj = dmu()
 
 ''' Start mqtt client '''
-mqttObj = mqttClient("mqtt", dmuObj)
+mqtt_url = str(os.getenv('MQTTURL'))
+mqttObj = mqttClient(mqtt_url, dmuObj)
 
 httpSrvThread2 = threading.Thread(name='httpSrv',target=httpSrv, args=("0.0.0.0", int(ext_port) ,dmuObj,))
 httpSrvThread2.start()
