@@ -1,3 +1,24 @@
 I, Markus Robert Mirz hereby sign-off-by all of my past commits to this repo subject to the Developer Certificate of Origin (DCO), Version 1.1. In the past I have used emails: markus.mirz@rwth-aachen.de
 
 22ad5838f7e91194afd5a8f27eb27eb78dfd2523 Add LICENSE
+
+I, Edoardo De Din hereby sign-off-by all of my past commits to this repo subject to the Developer Certificate of Origin (DCO), Version 1.1. In the past I have used emails: ede@ubuntu-ede-1.acs-lab.eonerc.rwth-aachen.de, acs-ede@Laptop-acs051.eonerc.rwth-aachen.de
+
+e75c11ac7bab916153f7880b229b5c666f28a9a9 new LV case
+f95f2eb741577587a1bbc35eb1450d55fc14f41a telegraf and influx for visualization
+111513d2fd64ded63f218bca7d8f9f35a354da10 modified powerflow
+eb9e3580fe5eb7b5d57e2bacc997cde9facdd61a solved problem with grafana
+594a6c85cad834dccde668999f04ca9741897413 powerflow modified for battery
+801bd886766a29e8327151156312b4719f9e0839 changed submodule path
+05dc36f3b975ff9eeda45740b3f744afc4fd0b42 New version running with MQTT
+b2d3245e8d3177c26dfb4686b452863bb5f41866 sending voltage measurements corrected
+45e27f9772068dadb82ad6c08ee6a16d1e02ca16 modified assignment of the set-points
+12c3cf0f79c0d77fb5bbd17db45c4e321179449d modified runPF, dockerfile and docker-compose for edgeflex architecture
+12e9783ab749e0a0b8a8e393bacbde72d4031e8d mqtt added, dockerfile and docker-compose added
+3c1596c03e84a33b7573e4ff0c973d4b26961e90 Update .gitignore
+7696c0f02e73c17f0b1f820fc355f9b1f56f7663 Update README.md
+0e6e0588fa635f744f64023ccd3e3fb67370cd60 Initial commit
+6cd291f530ae1c5c8065cc0d8d18e6f1a9cf4766 dmu submodule
+3d4f4e60f250d7b2055b4fdb7ca00a23032b8296 removed dmu not as submodule
+757a1b035724b2fa15e13914370136c5855e49db first commit submodule powerflow
+
