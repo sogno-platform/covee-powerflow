@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:18.04
 MAINTAINER Edoardo De Din ededin@eonerc.rwth-aachen.de
 
 RUN apt-get update -y \
