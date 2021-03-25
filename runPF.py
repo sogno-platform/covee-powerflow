@@ -315,27 +315,29 @@ try:
                 full_active_power_ESS_dict[key] = active_power_ESS[key]
             p_ESS_value = list(full_active_power_ESS_dict.values())
 
-        pv_profile_k = (0.4*np.array(PV_list[k][:])).tolist()#[1.4]*len(active_nodes)#
-        pv_profile_k.extend((0.4*np.array(PV_list[k][:])).tolist())
-        p_load_k = (P_load_list[k][:]).tolist()#[0.5]*grid_data["nb"]#
-        p_load_k.extend((P_load_list[k][:]).tolist())
+        pv_profile_k = [1.0]*len(active_nodes)#(0.4*np.array(PV_list[k][:])).tolist()#[1.4]*len(active_nodes)#
+        pv_profile_k.extend(([1.0]*len(active_nodes)))
+        p_load_k = [0.45]*grid_data["nb"]#(P_load_list[k][:]).tolist()#[0.5]*grid_data["nb"]#
+        p_load_k.extend(([0.45]*grid_data["nb"]))
         p_load_extended = p_load_k
 
         print("active nodes ",active_nodes)
         [v_tot,v_gen,p,c] = run_Power_Flow(ppc,active_nodes, active_ESS,p_value,q_value,p_ESS_value,pv_profile_k,p_load_k)
-      
+
         for i in range(len(full_nodes)):
             voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[int(full_nodes[i])-1]
             pv_input_dict["node_"+str(int(full_nodes[i]))] = pv_profile_k[i]
         dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
         dmuObj.setDataSubset({"pv_input_measurements": pv_input_dict},"pv_input_dict")
 
-        measurements={"test":0.1}
-        measurements.update({"voltage_measurements": voltage_dict})
-        measurements.update({"pv_input_measurements": pv_input_dict})
-        measurements.update({"active_power_control_dict": active_power_value})
-        measurements.update({"reactive_power_control_dict": reactive_power_value})
-        measurements.update({"active_power_ESS_control_dict": active_power_ESS_value})      
+        measurements={"VMAX":22e3}
+        measurements.update({"VMIN":18e3})
+        measurements.update({"voltage_measurements": [v_tot[int(full_nodes[i])-1]*20e3 for i in range(len(full_nodes))]})
+        measurements.update({"pv_input_measurements": [ p[i]*10e3 for i in range(len(full_nodes))]})
+        measurements.update({"active_power_control_dict": [p_value[i]*10e3 for i in range(len(p_value))]})
+        measurements.update({"reactive_power_control_dict": [q_value[i]*10e3 for i in range(len(q_value))]})
+        measurements.update({"active_power_ESS_control_dict": [p_ESS_value[i]*10e3 for i in range(len(p_ESS_value))]})      
+        measurements.update({"reactive_percentage": [(-q_value[i]-0.31512)*10e3 for i in range(len(p_ESS_value))]})      
         dmuObj.setDataSubset(measurements,"measurements")
 
         logging.debug(active_power_value)        
@@ -348,55 +350,55 @@ try:
         load_tot.append(p_load_extended)
         active_nodes_list.append(active_nodes)
 
-        time.sleep(0.3)
+        time.sleep(0.02)
         k += 1
         k = min(k+1,2159)
-        print("K = ",k)
-        if k >= 2159:
-            rows = voltage_tot
-            with open('powerflow/csv_files/voltage.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
-                wr = csv.writer(csv_file)
-                for row in rows:
-                    wr.writerow(row)
-            csv_file.close()
+        # print("K = ",k)
+        # if k >= 2159:
+        #     rows = voltage_tot
+        #     with open('powerflow/csv_files/voltage.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        #         wr = csv.writer(csv_file)
+        #         for row in rows:
+        #             wr.writerow(row)
+        #     csv_file.close()
 
-            rows = active_power_pv_tot
-            with open('powerflow/csv_files/active_power_pv_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
-                wr = csv.writer(csv_file)
-                for row in rows:
-                    wr.writerow(row)
-            csv_file.close()
+        #     rows = active_power_pv_tot
+        #     with open('powerflow/csv_files/active_power_pv_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        #         wr = csv.writer(csv_file)
+        #         for row in rows:
+        #             wr.writerow(row)
+        #     csv_file.close()
 
-            rows = reactive_power_pv_tot
-            with open('powerflow/csv_files/reactive_power_pv_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
-                wr = csv.writer(csv_file)
-                for row in rows:
-                    wr.writerow(row)
-            csv_file.close()
+        #     rows = reactive_power_pv_tot
+        #     with open('powerflow/csv_files/reactive_power_pv_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        #         wr = csv.writer(csv_file)
+        #         for row in rows:
+        #             wr.writerow(row)
+        #     csv_file.close()
 
-            rows = active_power_ess_tot
-            with open('powerflow/csv_files/active_power_ess_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
-                wr = csv.writer(csv_file)
-                for row in rows:
-                    wr.writerow(row)
-            csv_file.close()
+        #     rows = active_power_ess_tot
+        #     with open('powerflow/csv_files/active_power_ess_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        #         wr = csv.writer(csv_file)
+        #         for row in rows:
+        #             wr.writerow(row)
+        #     csv_file.close()
 
-            rows = load_tot
-            with open('powerflow/csv_files/load_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
-                wr = csv.writer(csv_file)
-                for row in rows:
-                    wr.writerow(row)
-            csv_file.close()
+        #     rows = load_tot
+        #     with open('powerflow/csv_files/load_tot.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        #         wr = csv.writer(csv_file)
+        #         for row in rows:
+        #             wr.writerow(row)
+        #     csv_file.close()
 
-            rows = active_nodes_list
-            with open('powerflow/csv_files/active_nodes_list.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
-                wr = csv.writer(csv_file)
-                for row in rows:
-                    wr.writerow(row)
-            csv_file.close()
+        #     rows = active_nodes_list
+        #     with open('powerflow/csv_files/active_nodes_list.csv', 'w+', encoding="ISO-8859-1", newline='') as csv_file:
+        #         wr = csv.writer(csv_file)
+        #         for row in rows:
+        #             wr.writerow(row)
+        #     csv_file.close()
 
-            print('simulation finished')
-            break
+        #     print('simulation finished')
+        #     break
 
 except (KeyboardInterrupt, SystemExit):
 
