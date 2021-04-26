@@ -315,10 +315,10 @@ try:
                 full_active_power_ESS_dict[key] = active_power_ESS[key]
             p_ESS_value = list(full_active_power_ESS_dict.values())
 
-        pv_profile_k = [1.0]*len(active_nodes)#(0.4*np.array(PV_list[k][:])).tolist()#[1.4]*len(active_nodes)#
-        pv_profile_k.extend(([1.0]*len(active_nodes)))
-        p_load_k = [0.45]*grid_data["nb"]#(P_load_list[k][:]).tolist()#[0.5]*grid_data["nb"]#
-        p_load_k.extend(([0.45]*grid_data["nb"]))
+        pv_profile_k = [1.1]*len(active_nodes)#(0.4*np.array(PV_list[k][:])).tolist()#[1.4]*len(active_nodes)#
+        pv_profile_k.extend(([1.1]*len(active_nodes)))
+        p_load_k = [0.28]*grid_data["nb"]#(P_load_list[k][:]).tolist()#[0.5]*grid_data["nb"]#
+        p_load_k.extend(([0.28]*grid_data["nb"]))
         p_load_extended = p_load_k
 
         print("active nodes ",active_nodes)
