@@ -44,17 +44,15 @@ logging.info("Program Start")
 
 if bool(os.getenv('MQTT_ENABLED')):
     mqtt_url = str(os.getenv('MQTTURL'))
-    mqtt_port = os.getenv('MQTTPORT')
+    mqtt_port = int(os.getenv('MQTTPORT'))
+    mqtt_user = str(os.getenv('MQTTUSER'))
+    mqtt_password = str(os.getenv('MQTTPASS'))
+else:
+    mqtt_url = "mqtt"
+    mqtt_port = 1883
+    mqtt_password = ""
+    mqtt_user = ""
     # logging.debug("MQTT COnnection Details "+ mqtt_url+" : "+mqtt_port)
-
-    try:
-        logging.info("Establishing MQTT Connection")
-        client = mqtt.Client()
-        client.connect('reserve-msgbroker-local', port=1883)
-        logging.info("MQTT Connection Established")
-    except Exception as e:
-        logging.error("Failed to establish MQTT connection")
-        logging.error(e)
 
 def initialize( name, profiles):
     # Input Data
@@ -161,7 +159,7 @@ def run_Power_Flow(ppc, active_nodes, active_ESS, active_power,reactive_power,ac
 dmuObj = dmu()
 
 ''' Start mqtt client '''
-mqttObj = mqttClient("mqtt", dmuObj)
+mqttObj = mqttClient(mqtt_url, dmuObj, mqtt_port, mqtt_user, mqtt_password)
 
 httpSrvThread2 = threading.Thread(name='httpSrv',target=httpSrv, args=("0.0.0.0", int(ext_port) ,dmuObj,))
 httpSrvThread2.start()
