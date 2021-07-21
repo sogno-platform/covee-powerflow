@@ -52,6 +52,7 @@ else:
     mqtt_port = 1883
     mqtt_password = ""
     mqtt_user = ""
+    
     # logging.debug("MQTT COnnection Details "+ mqtt_url+" : "+mqtt_port)
 
 def initialize( name, profiles):
