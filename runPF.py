@@ -5,7 +5,7 @@ from pypower.idx_bus import BUS_I, BUS_TYPE, REF, PD, QD, VM, VA, VMAX, VMIN
 from pypower.idx_gen import GEN_BUS, PG, QG, PMAX, PMIN, QMAX, QMIN, VG
 from pypower.int2ext import int2ext
 
-from cases.LV_SOGNO import LV_SOGNO as case
+from cases.case_10_nodes import case_10_nodes as case
 from csv_files.read_profiles import read_profiles
 
 import numpy as np
@@ -13,7 +13,7 @@ from pypower.ppoption import ppoption
 import csv
 import os
 import coloredlogs, logging, threading
-from threading import Thread
+from threading import Thread, Event
 from submodules.dmu.dmu import dmu
 from submodules.dmu.httpSrv import httpSrv
 from submodules.dmu.mqttClient import mqttClient
@@ -25,12 +25,13 @@ import csv
 import argparse
 import paho.mqtt.client as mqtt
 
+from datetime import timedelta
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--ext_port', nargs='*', required=True)
 args = vars(parser.parse_args())
 ext_port = args['ext_port'][0]
 
-cwd = os.getcwd()
 
 coloredlogs.install(level='DEBUG',
 fmt='%(asctime)s %(levelname)-8s %(name)s[%(process)d] %(message)s',
@@ -120,18 +121,23 @@ def run_Power_Flow(ppc, active_nodes, active_ESS, active_power,reactive_power,ac
     v_tot = []
 
     ############## SET THE ACTUAL LOAD AND GEN VALUES ###############-+
-    for i in range(int(nb)-1):
-        bus[i+1][PD] = load_profile[i]#0.3 
-        bus[i+1][QD] = 0.0
-    for j in range(len(active_ESS)):
-        if float(j) == bus[j+1][BUS_I]:
-            bus[i+1][PD] = bus[i+1][PD]-active_power_ESS[j]
-    for i in range(ng-1):
-        gen[i+1][PG] = pv_profile[i]
-    for j in range(len(c)):
-        if float(j) == gen[j][GEN_BUS]:
-            gen[j+1][QG] = reactive_power[j]
-            gen[j+1][PG] = gen[j+1][PG] + active_power[j]
+    s = 0
+    for i in range(int(nb)):
+        bus[i][PD] = load_profile[i] 
+        bus[i][QD] = 0.0
+        if any(bus[i][BUS_I] == float(active_ESS[k]) for k in range(len(active_ESS))):
+            bus[i][PD] = load_profile[i]-active_power_ESS[s]
+            s +=1
+    r = 0
+    for j in range(int(ng)):
+        gen[j][PG] = 0.0#+active_power[j]
+        gen[j][QG] = 0.0#reactive_power[j]
+        if any(gen[j][GEN_BUS] == float(active_nodes[k]) for k in range(len(active_nodes))):
+            gen[j][QG] = reactive_power[r]
+            gen[j][PG] = pv_profile[r]+active_power[r]
+            r +=1
+        else: 
+            pass
 
     ppc['bus'] = bus
     ppc['gen'] = gen
@@ -239,6 +245,10 @@ mqttObj.attachPublisher("/voltage_control/measuremnts/voltage","json","voltage_d
 mqttObj.attachPublisher("/voltage_control/measuremnts/pv","json","pv_input_dict")
 mqttObj.attachPublisher("measurements","json","measurements")
 
+# Send meas to pmu
+dmuObj.addElm("powerflow_output", {})
+mqttObj.attachPublisher("/edgeflex/edgepmu0/ch0/voltage_rms","json","powerflow_output")
+
 # read profiles from CSV files
 # =======================================================================
 profiles = read_profiles()
@@ -247,7 +257,7 @@ profiles = read_profiles()
 ppc = case()
 grid_data = initialize(ppc, [PV_list, P_load_list])
 
-k=0
+iter_k=0
 
 ########################## Initialization vectors  ######################################################
 active_nodes = list(np.array(np.matrix(ppc["gen"])[:,0]).flatten())
@@ -258,6 +268,7 @@ active_ESS = active_nodes
 full_active_power_dict = {}
 full_reactive_power_dict = {}
 full_active_power_ESS_dict = {}
+v_old =  [0.0]*len(full_nodes)
 for i in full_nodes:
     full_active_power_dict["node_"+str(int(i))] = 0.0
     full_reactive_power_dict["node_"+str(int(i))] = 0.0
@@ -281,6 +292,7 @@ try:
         
         active_power_value = dmuObj.getDataSubset("active_power_control_dict")
         active_power = active_power_value.get("active_power", None)
+        logging.info(active_power)
         reactive_power_value = dmuObj.getDataSubset("reactive_power_control_dict")
         reactive_power = reactive_power_value.get("reactive_power", None)
 
@@ -314,30 +326,48 @@ try:
                 full_active_power_ESS_dict[key] = active_power_ESS[key]
             p_ESS_value = list(full_active_power_ESS_dict.values())
 
-        pv_profile_k = [1.1]*len(active_nodes)#(0.4*np.array(PV_list[k][:])).tolist()#[1.4]*len(active_nodes)#
-        pv_profile_k.extend(([1.1]*len(active_nodes)))
-        p_load_k = [0.28]*grid_data["nb"]#(P_load_list[k][:]).tolist()#[0.5]*grid_data["nb"]#
-        p_load_k.extend(([0.28]*grid_data["nb"]))
-        p_load_extended = p_load_k
+
+        profile = "fixed"
+        if profile == "fixed":
+            pv_profile_k = [2.0]*len(active_nodes)
+        elif profile == "variable":
+            pv_profile_k = (1.0*np.array(PV_list[k][:])).tolist()
+            pv_profile_k.extend((1.0*np.array(PV_list[k][:])).tolist())
+        else:
+            print("error")
+
+        p_load_k = [0.05]*grid_data["nb"]#(P_load_list[k][:]).tolist()
 
         print("active nodes ",active_nodes)
         [v_tot,v_gen,p,c] = run_Power_Flow(ppc,active_nodes, active_ESS,p_value,q_value,p_ESS_value,pv_profile_k,p_load_k)
 
+
         for i in range(len(full_nodes)):
             voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[int(full_nodes[i])-1]
-            pv_input_dict["node_"+str(int(full_nodes[i]))] = pv_profile_k[i]
-        dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
-        dmuObj.setDataSubset({"pv_input_measurements": pv_input_dict},"pv_input_dict")
+        for k in range(len(active_nodes)):
+            pv_input_dict["node_"+str(int(active_nodes[k])+1)] = pv_profile_k[int(k)]
+        print(pv_input_dict)
 
-        measurements={"VMAX":22e3}
+        if iter_k%1 == 0 and iter_k!=0:
+            dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
+            dmuObj.setDataSubset({"pv_input_measurements": pv_input_dict},"pv_input_dict")
+            if str(os.getenv('MQTT_ENABLED')) == "true":
+                dmuObj.setDataSubset({"voltage_node": voltage_dict["node_"+str(int(active_nodes[-1]))]*115.0},"powerflow_output")
+        else:
+            pass
+        
+        print("voltage",voltage_dict)
+
+        measurements={"VMAX":126.5}
         measurements.update({"VMIN":18e3})
-        measurements.update({"voltage_measurements": [v_tot[int(full_nodes[i])-1]*20e3 for i in range(len(full_nodes))]})
-        measurements.update({"pv_input_measurements": [ p[i]*10e3 for i in range(len(full_nodes))]})
-        measurements.update({"active_power_control_dict": [p_value[i]*10e3 for i in range(len(p_value))]})
-        measurements.update({"reactive_power_control_dict": [q_value[i]*10e3 for i in range(len(q_value))]})
-        measurements.update({"active_power_ESS_control_dict": [p_ESS_value[i]*10e3 for i in range(len(p_ESS_value))]})      
-        measurements.update({"reactive_percentage": [(-q_value[i]-0.31512)*10e3 for i in range(len(p_ESS_value))]})      
+        measurements.update({"voltage_measurements": [v_tot[int(full_nodes[i])-1]*230 for i in range(len(full_nodes))]})
+        measurements.update({"pv_input_measurements": [ p[i]*6e3 for i in range(len(p))]})
+        measurements.update({"active_power_control_dict": [p_value[i]*6e3 for i in range(len(p_value))]})
+        measurements.update({"reactive_power_control_dict": [q_value[i]*6e3 for i in range(len(q_value))]})
+        measurements.update({"active_power_ESS_control_dict": [p_ESS_value[i]*6e3 for i in range(len(p_ESS_value))]})      
+        measurements.update({"reactive_percentage": [(-q_value[i]-0.31512)*6e3 for i in range(len(q_value))]})      
         dmuObj.setDataSubset(measurements,"measurements")
+
 
         logging.debug(active_power_value)        
         logging.debug(reactive_power_value)
@@ -346,12 +376,14 @@ try:
         active_power_pv_tot.append(p)
         reactive_power_pv_tot.append(q_value)
         active_power_ess_tot.append(p_ESS_value)
-        load_tot.append(p_load_extended)
+        load_tot.append(p_load_k)
         active_nodes_list.append(active_nodes)
 
-        time.sleep(0.02)
-        k += 1
-        k = min(k+1,2159)
+        time.sleep(0.5)
+        iter_k += 1
+        if iter_k == 2159:
+            iter_k = 0
+        #k = min(k+1,2159)
         # print("K = ",k)
         # if k >= 2159:
         #     rows = voltage_tot
