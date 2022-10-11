@@ -1,17 +1,17 @@
 FROM ubuntu:18.04
-MAINTAINER Edoardo De Din ededin@eonerc.rwth-aachen.de
+LABEL author="Edoardo De Din" 
+LABEL author_contact="ededin@eonerc.rwth-aachen.de"
 
-RUN apt-get update -y \
-    && apt-get upgrade -y \ 
-    && apt-get install build-essential -y \
-    && apt install python3-pip -y  \
-    && apt-get install python3-venv -y \
-    && apt-get install sudo -y 
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
+WORKDIR /powerflow
+COPY requirements.txt .
 
-# ENV VIRTUAL_ENV=/opt/venv
-# RUN python3 -m virtualenv --python=/usr/bin/python3 $VIRTUAL_ENV
-# ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-EXPOSE 1883
-
-COPY setup/requirements_docker.txt .
-RUN pip3 install -r requirements_docker.txt
+RUN apt-get update -y
+RUN apt-get upgrade -y
+RUN apt-get install build-essential git -y
+RUN apt install python3-pip -y  \
+    && pip3 install setuptools \
+    && pip3 install --upgrade pip \
+    && pip3 install wheel \
+    && pip3 install -r requirements.txt

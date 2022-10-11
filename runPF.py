@@ -5,7 +5,6 @@ from pypower.idx_bus import BUS_I, BUS_TYPE, REF, PD, QD, VM, VA, VMAX, VMIN
 from pypower.idx_gen import GEN_BUS, PG, QG, PMAX, PMIN, QMAX, QMIN, VG
 from pypower.int2ext import int2ext
 
-from cases.case_10_nodes import case_10_nodes as case
 from csv_files.read_profiles import read_profiles
 
 import numpy as np
@@ -27,10 +26,23 @@ import paho.mqtt.client as mqtt
 
 from datetime import timedelta
 
+import utils as utils
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--ext_port', nargs='*', required=True)
 args = vars(parser.parse_args())
 ext_port = args['ext_port'][0]
+
+# Read json file and set Control Strategy and Case 
+# =====================================================================================================
+with open("./examples/conf.json", "r") as f:
+    conf_dict = json.load(f)
+
+module_obj = utils.select(conf_dict)
+case = module_obj.select_case()
+# =====================================================================================================
+
 
 
 coloredlogs.install(level='DEBUG',
@@ -254,7 +266,8 @@ mqttObj.attachPublisher("/edgeflex/edgepmu0/ch0/voltage_rms","json","powerflow_o
 profiles = read_profiles()
 [PV_list, P_load_list] = profiles.read_csv()
 
-ppc = case()
+ppc_obj = case.case_()
+ppc = ppc_obj.case()
 grid_data = initialize(ppc, [PV_list, P_load_list])
 
 iter_k=0
@@ -264,6 +277,10 @@ active_nodes = list(np.array(np.matrix(ppc["gen"])[:,0]).flatten())
 full_nodes = active_nodes[1:len(active_nodes)]
 active_nodes = active_nodes[1:len(active_nodes)]
 active_nodes = [float(i)-1 for i in active_nodes]
+
+active_nodes = json.loads(str(os.getenv('ACTIVE_NODES')))
+active_nodes = list(map(int, active_nodes))
+
 active_ESS = active_nodes
 full_active_power_dict = {}
 full_reactive_power_dict = {}
@@ -292,7 +309,7 @@ try:
         
         active_power_value = dmuObj.getDataSubset("active_power_control_dict")
         active_power = active_power_value.get("active_power", None)
-        logging.info(active_power)
+
         reactive_power_value = dmuObj.getDataSubset("reactive_power_control_dict")
         reactive_power = reactive_power_value.get("reactive_power", None)
 
@@ -326,10 +343,12 @@ try:
                 full_active_power_ESS_dict[key] = active_power_ESS[key]
             p_ESS_value = list(full_active_power_ESS_dict.values())
 
+        p_value = list(np.array(p_value, dtype=np.float32))
+        logging.debug("received active power " +str(p_value))
 
         profile = "fixed"
         if profile == "fixed":
-            pv_profile_k = [2.0]*len(active_nodes)
+            pv_profile_k = [5.2]*len(active_nodes)
         elif profile == "variable":
             pv_profile_k = (1.0*np.array(PV_list[k][:])).tolist()
             pv_profile_k.extend((1.0*np.array(PV_list[k][:])).tolist())
@@ -346,7 +365,6 @@ try:
             voltage_dict["node_"+str(int(full_nodes[i]))] = v_tot[int(full_nodes[i])-1]
         for k in range(len(active_nodes)):
             pv_input_dict["node_"+str(int(active_nodes[k])+1)] = pv_profile_k[int(k)]
-        print(pv_input_dict)
 
         if iter_k%1 == 0 and iter_k!=0:
             dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
@@ -369,8 +387,8 @@ try:
         dmuObj.setDataSubset(measurements,"measurements")
 
 
-        logging.debug(active_power_value)        
-        logging.debug(reactive_power_value)
+        # logging.debug(active_power_value)        
+        # logging.debug(reactive_power_value)
 
         voltage_tot.append(v_tot)
         active_power_pv_tot.append(p)

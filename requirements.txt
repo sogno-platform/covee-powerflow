@@ -1,0 +1,11 @@
+numpy
+scipy
+PYPOWER
+matplotlib
+ipython
+requests
+coloredlogs
+paho-mqtt
+matplotlib
+osqp
+dmu @ git+https://git.rwth-aachen.de/acs/public/automation/modules/dmu.git

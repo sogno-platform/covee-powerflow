@@ -16,7 +16,7 @@ class read_profiles:
         # =============================================================
 
         cwd = os.getcwd()
-        wd = os.path.join(cwd, 'covee-powerflow/data/profiles/simple_test_profiles')
+        wd = os.path.join(cwd, 'data/profiles/simple_test_profiles')
         wd.replace("\\", "/")
         with open(os.path.join(wd, 'PV_profile_LV_SOGNO_4kw.csv')) as csv_file: #10 Nodes: 10_nodes_PV # No Cloud: PV_profile_LV_SOGNO_4kw  #With Cloud: PV_profile_LV_SOGNO-cloudlevel-2.csv
             pvproduction = csv.reader(csv_file, delimiter=',')
