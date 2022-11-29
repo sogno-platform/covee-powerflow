@@ -51,7 +51,7 @@ BUS_TYPE = 1
 
 # Initialize the powerflow
 # =====================================================================================================
-run_PF = runPF_class(active_nodes, active_ESS, grid_data["full_nodes"], grid_data["total_control_nodes"])
+run_PF = runPF_class(active_nodes, active_ESS, grid_data["full_nodes"], grid_data["total_control_nodes"], conf_dict["POWERFLOW_DATA"]["uncontrolled_nodes"] )
 profiles = run_PF.read_profiles(conf_dict, grid_data)
 full_active_power_dict = {}
 full_reactive_power_dict = {}

@@ -19,11 +19,12 @@ from powerflow_class.csv_files.read_profiles import read_profiles
 
 class runPF_class():
 
-    def __init__(self, active_nodes, active_ESS, full_nodes, total_nodes):
+    def __init__(self, active_nodes, active_ESS, full_nodes, total_nodes,uncontrolled_nodes):
         self.active_nodes = active_nodes
         self.active_ESS = active_ESS
         self.full_nodes = full_nodes
         self.total_nodes = total_nodes
+        self.uncontrolled_nodes = uncontrolled_nodes
 
     def read_profiles(self, conf_dict, grid_data):
         profile_out = {}
@@ -132,6 +133,9 @@ class runPF_class():
             if any(gen[j][GEN_BUS] == float(self.active_nodes[k]) for k in range(len(self.active_nodes))):                
                 gen[j][QG] = reactive_power[j]
                 gen[j][PG] = pv_profile[r]+active_power[j]
+                r +=1
+            if any(gen[j][GEN_BUS] == float(self.uncontrolled_nodes[k]) for k in range(len(self.uncontrolled_nodes))):  
+                gen[j][PG] = pv_profile[r]
                 r +=1
             else: 
                 pass
