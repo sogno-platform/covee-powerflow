@@ -147,8 +147,8 @@ def reactive_power_control_input(data, uuid, name,  *args):
 
 def api_cntr_input(data, uuid, name,  *args):   
     tmpData = []
-    logging.debug("RECEIVED EXTERNAL CONTROL")
-    logging.debug(data)       
+    # logging.debug("RECEIVED EXTERNAL CONTROL")
+    # logging.debug(data)       
     dmuObj.setDataSubset(data,"simDict", "active_nodes")
 
 # Receive from external Control
@@ -165,6 +165,26 @@ mqttObj.attachSubscriber("/voltage_control/control/reactive_power", "json","reac
 dmuObj.addElm("active_power_ESS", simDict)
 mqttObj.attachSubscriber("/voltage_control/control/active_power_ESS", "json","active_power_ESS_control_dict")
 
+# Receive from PMU
+dmuObj.addElm("edgePMU3", {})
+mqttObj.attachSubscriber("/location_10003/30025/edgePMU3 ch1 amplitude","json","edgePMU3")
+dmuObj.addElm("edgePMU4", {})
+mqttObj.attachSubscriber("/location_10001/30001/edgePMU4 ch1 amplitude","json","edgePMU4")
+dmuObj.addElm("edgePMU9", {})
+mqttObj.attachSubscriber("/location_10002/30013/edgePMU9 ch1 amplitude","json","edgePMU9")
+
+# Receive from Kibertnet
+dmuObj.addElm("location4", {})
+mqttObj.attachSubscriber("/location_4/4/operationPower","json","location4")
+dmuObj.addElm("location7", {})
+mqttObj.attachSubscriber("/location_7/7/operationPower","json","location7")
+dmuObj.addElm("location34", {})
+mqttObj.attachSubscriber("/location_34/34/operationPower","json","location34")
+dmuObj.addElm("location35", {})
+mqttObj.attachSubscriber("/location_35/35/operationPower","json","location35")
+dmuObj.addElm("location36", {})
+mqttObj.attachSubscriber("/location_36/36/operationPower","json","location36")
+
 ########################################################################################################
 #########################  Section for Sending Signal  #################################################
 ########################################################################################################
@@ -172,12 +192,6 @@ mqttObj.attachSubscriber("/voltage_control/control/active_power_ESS", "json","ac
 mqttObj.attachPublisher("/voltage_control/measuremnts/voltage","json","voltage_dict")
 mqttObj.attachPublisher("/voltage_control/measuremnts/pv","json","pv_input_dict")
 mqttObj.attachPublisher("measurements","json","measurements")
-
-# Send meas to pmu
-dmuObj.addElm("powerflow_output", {})
-mqttObj.attachPublisher("/edgeflex/edgepmu0/ch0/voltage_rms","json","powerflow_output")
-
-
 
 ########################################### Main #########################################################
 try:
@@ -191,7 +205,7 @@ try:
         
         active_power_value = dmuObj.getDataSubset("active_power_control_dict")
         active_power = active_power_value.get("active_power", None)
-        print("RECEIVED: ",active_power )
+        # print("RECEIVED: ",active_power )
 
         reactive_power_value = dmuObj.getDataSubset("reactive_power_control_dict")
         reactive_power = reactive_power_value.get("reactive_power", None)
@@ -227,19 +241,48 @@ try:
             p_ESS_value = list(full_active_power_ESS_dict.values())
 
         # p_value = list(np.array(p_value, dtype=np.float32))
-        logging.debug("received active power " +str(p_value))
+        # logging.debug("received active power " +str(p_value))
+
+        for k in range(len(active_nodes)):
+            pv_input_dict["node_"+str(int(active_nodes[k])+1)] = profiles["gen_profile"][iter_k][int(k)]
+    
+        '''
+        Integrate the Kibernet measurements
+        '''
+        if dmuObj.getDataSubset("location4"):
+            pv_input_dict["node_27"] = dmuObj.getDataSubset("location4","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+            profiles["gen_profile"][iter_k][27] = dmuObj.getDataSubset("location4","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+        if dmuObj.getDataSubset("location7"):
+            pv_input_dict["node_10"] = dmuObj.getDataSubset("location7","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+            profiles["gen_profile"][iter_k][10] = dmuObj.getDataSubset("location7","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+        if dmuObj.getDataSubset("location34"):
+            pv_input_dict["node_11"] = dmuObj.getDataSubset("location34","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+            profiles["gen_profile"][iter_k][11] = dmuObj.getDataSubset("location34","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+        if dmuObj.getDataSubset("location35"):
+            pv_input_dict["node_12"] = dmuObj.getDataSubset("location35","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+            profiles["gen_profile"][iter_k][12] = dmuObj.getDataSubset("location35","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+        if dmuObj.getDataSubset("location36"):
+            pv_input_dict["node_13"] = dmuObj.getDataSubset("location36","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
+            profiles["gen_profile"][iter_k][13] = dmuObj.getDataSubset("location36","value")/conf_dict["POWERFLOW_DATA"]["P_base"]
 
 
         print("active nodes ",active_nodes)
         ################################# Run the PowerFlow #####################################
         ##############################################################################################################
         [v_tot, v_gen, p, c, p_load, v_pv, v_ess] = run_PF.run_Power_Flow(ppc,p_value,q_value,p_ESS_value,profiles["gen_profile"][iter_k],profiles["load_profile"][iter_k])
-        
 
         for i in range(len(grid_data["full_nodes"])):
             voltage_dict["node_"+str(int(grid_data["full_nodes"][i]))] = v_tot[int(grid_data["full_nodes"][i])]
-        for k in range(len(active_nodes)):
-            pv_input_dict["node_"+str(int(active_nodes[k])+1)] = profiles["gen_profile"][iter_k][int(k)]
+
+        '''
+        Integrate the PMU measurements
+        '''
+        if dmuObj.getDataSubset("edgePMU3"):
+            voltage_dict["node_7"] = dmuObj.getDataSubset("edgePMU3","value")/conf_dict["POWERFLOW_DATA"]["V_base"]
+        if dmuObj.getDataSubset("edgePMU4"):
+            voltage_dict["node_11"] = dmuObj.getDataSubset("edgePMU4","value")/conf_dict["POWERFLOW_DATA"]["V_base"]
+        if dmuObj.getDataSubset("edgePMU9"):
+            pv_input_dict["node_23"] = dmuObj.getDataSubset("edgePMU9","value")/conf_dict["POWERFLOW_DATA"]["V_base"]
 
         if iter_k%1 == 0 and iter_k!=0:
             dmuObj.setDataSubset({"voltage_measurements": voltage_dict},"voltage_dict")
